@@ -6,7 +6,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 class ApiService {
   final Dio dio = Dio(BaseOptions(
     // Укажи здесь IP своего сервера (10.0.2.2 для эмулятора Android или реальный IP)
-    baseUrl: 'http://127.0.0.1:8000/api/',
+    baseUrl: 'http://192.168.2.128:8000/api/',
     connectTimeout: const Duration(seconds: 10),
     receiveTimeout: const Duration(seconds: 10),
     headers: {
