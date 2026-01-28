@@ -364,13 +364,16 @@ class ApiService {
 
   // Compose method
   Future<Map<String, dynamic>> composeTrain(List<Map<String, dynamic>> items,
-      {double? maxTotalLength}) async {
+      {double? maxTotalLength, int? totalWagonsCount}) async {
     try {
       final body = <String, dynamic>{
         'items': items,
       };
       if (maxTotalLength != null) {
         body['max_total_length'] = maxTotalLength;
+      }
+      if (totalWagonsCount != null) {
+        body['total_wagons_count'] = totalWagonsCount;
       }
 
       final response = await http.post(
