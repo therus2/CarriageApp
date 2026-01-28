@@ -1,16 +1,20 @@
-# carriage
+# Система учета и сортировки вагонов
 
-A new Flutter project.
+Профессиональное решение для управления железнодорожной станцией.
 
-## Getting Started
+## Быстрый старт (Backend)
+1. Перейдите в папку `backend/`.
+2. Создайте окружение: `python -m venv venv`.
+3. Установите зависимости: `pip install -r requirements.txt`.
+4. Выполните миграции: `python manage.py migrate`.
+5. Запустите сервер: `python manage.py runserver`.
 
-This project is a starting point for a Flutter application.
+## Быстрый старт (Frontend - Flutter)
+1. Убедитесь, что Flutter установлен.
+2. В корне проекта: `flutter pub get`.
+3. Запустите на эмуляторе или в Chrome: `flutter run`.
 
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Роли для тестирования:
+- **Admin**: доступ ко всем функциям.
+- **Dispatcher**: ввод данных о прибытии вагонов.
+- **Composer**: формирование составов и алгоритм подбора.
