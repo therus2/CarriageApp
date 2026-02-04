@@ -19,6 +19,7 @@ class _ComposerScreenState extends State<ComposerScreen> {
   final _totalWagonsCountController = TextEditingController();
   bool _isComposing = false;
   List<Wagon> _composedWagons = [];
+  Set<int> _selectedWagonIds = {}; // ID выбранных вагонов для визуального выделения
   String? _composeError;
   double? _totalLength;
 
@@ -536,45 +537,209 @@ class _ComposerScreenState extends State<ComposerScreen> {
                 Expanded(
                   child: _isComposing
                       ? const Center(child: CircularProgressIndicator())
-                      : _composedWagons.isEmpty
-                          ? Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.train,
-                                    size: 64,
-                                    color: Colors.grey.shade400,
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    _composeError ??
-                                        'Укажите параметры и нажмите "Подобрать состав"',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      color: Colors.grey.shade600,
+                      : DragTarget<Wagon>(
+                          onAccept: (wagon) {
+                            setState(() {
+                              if (!_composedWagons.any((w) => w.id == wagon.id)) {
+                                _composedWagons.add(wagon);
+                                _selectedWagonIds.add(wagon.id ?? 0);
+                                _totalLength = _composedWagons
+                                    .fold<double>(0.0, (sum, w) => sum + w.length);
+                              }
+                            });
+                          },
+                          builder: (context, candidateData, rejectedData) {
+                            return Container(
+                              decoration: BoxDecoration(
+                                color: candidateData.isNotEmpty
+                                    ? Colors.blue.shade50
+                                    : Colors.transparent,
+                                border: candidateData.isNotEmpty
+                                    ? Border.all(color: Colors.blue, width: 2)
+                                    : null,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: _composedWagons.isEmpty
+                                  ? Center(
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.train,
+                                            size: 64,
+                                            color: candidateData.isNotEmpty
+                                                ? Colors.blue
+                                                : Colors.grey.shade400,
+                                          ),
+                                          const SizedBox(height: 16),
+                                          Text(
+                                            candidateData.isNotEmpty
+                                                ? 'Отпустите вагон здесь'
+                                                : (_composeError ??
+                                                    'Укажите параметры и нажмите "Подобрать состав"\nили перетащите вагоны из правой панели'),
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              color: candidateData.isNotEmpty
+                                                  ? Colors.blue
+                                                  : Colors.grey.shade600,
+                                            ),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ],
+                                      ),
+                                    )
+                                  : GridView.builder(
+                                      padding: const EdgeInsets.all(16),
+                                      gridDelegate:
+                                          const SliverGridDelegateWithFixedCrossAxisCount(
+                                        crossAxisCount: 3,
+                                        crossAxisSpacing: 12,
+                                        mainAxisSpacing: 12,
+                                        childAspectRatio: 0.85, // Уменьшено для компактности
+                                      ),
+                                      itemCount: _composedWagons.length,
+                                      itemBuilder: (context, index) {
+                                        final wagon = _composedWagons[index];
+                                        return DragTarget<Wagon>(
+                                          onAccept: (draggedWagon) {
+                                            setState(() {
+                                              final draggedIndex = _composedWagons
+                                                  .indexWhere((w) => w.id == draggedWagon.id);
+                                              if (draggedIndex != -1 && draggedIndex != index) {
+                                                // Удаляем вагон из старой позиции
+                                                _composedWagons.removeAt(draggedIndex);
+                                                // Вставляем в новую позицию
+                                                final newIndex = draggedIndex < index
+                                                    ? index - 1
+                                                    : index;
+                                                _composedWagons.insert(newIndex, draggedWagon);
+                                                // Пересчитываем длину
+                                                _totalLength = _composedWagons
+                                                    .fold<double>(0.0, (sum, w) => sum + w.length);
+                                              }
+                                            });
+                                          },
+                                          builder: (context, candidateData, rejectedData) {
+                                            return Draggable<Wagon>(
+                                              key: ValueKey('wagon_${wagon.id}_$index'),
+                                              data: wagon,
+                                              feedback: Material(
+                                                elevation: 8,
+                                                child: Container(
+                                                  width: 200,
+                                                  padding: const EdgeInsets.all(8),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.blue.shade100,
+                                                    borderRadius: BorderRadius.circular(8),
+                                                    border: Border.all(
+                                                      color: Colors.blue,
+                                                      width: 2,
+                                                    ),
+                                                  ),
+                                                  child: Column(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      Text(
+                                                        wagon.wagonNumber,
+                                                        style: const TextStyle(
+                                                          fontWeight: FontWeight.bold,
+                                                          fontSize: 16,
+                                                        ),
+                                                      ),
+                                                      if (wagon.wagonType != null)
+                                                        Text(
+                                                          wagon.wagonType!.name,
+                                                          style: const TextStyle(fontSize: 12),
+                                                        ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ),
+                                              childWhenDragging: Opacity(
+                                                opacity: 0.3,
+                                                child: Container(
+                                                  decoration: BoxDecoration(
+                                                    border: candidateData.isNotEmpty
+                                                        ? Border.all(
+                                                            color: Colors.green,
+                                                            width: 2,
+                                                          )
+                                                        : null,
+                                                    borderRadius: BorderRadius.circular(8),
+                                                  ),
+                                                  child: WagonCard(wagon: wagon),
+                                                ),
+                                              ),
+                                              child: Container(
+                                                decoration: BoxDecoration(
+                                                  border: candidateData.isNotEmpty
+                                                      ? Border.all(
+                                                          color: Colors.green,
+                                                          width: 2,
+                                                        )
+                                                      : null,
+                                                  borderRadius: BorderRadius.circular(8),
+                                                ),
+                                                child: Stack(
+                                                  children: [
+                                                    WagonCard(
+                                                      wagon: wagon,
+                                                      onTap: () {
+                                                        setState(() {
+                                                          _composedWagons.removeAt(index);
+                                                          _selectedWagonIds.remove(wagon.id ?? 0);
+                                                          _totalLength = _composedWagons
+                                                              .fold<double>(
+                                                                  0.0, (sum, w) => sum + w.length);
+                                                        });
+                                                      },
+                                                    ),
+                                                    Positioned(
+                                                      top: 4,
+                                                      left: 4,
+                                                      child: Container(
+                                                        padding: const EdgeInsets.all(4),
+                                                        decoration: BoxDecoration(
+                                                          color: Colors.blue.shade700,
+                                                          borderRadius: BorderRadius.circular(12),
+                                                        ),
+                                                        child: Text(
+                                                          '${index + 1}',
+                                                          style: const TextStyle(
+                                                            color: Colors.white,
+                                                            fontSize: 12,
+                                                            fontWeight: FontWeight.bold,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    Positioned(
+                                                      top: 4,
+                                                      right: 4,
+                                                      child: Container(
+                                                        padding: const EdgeInsets.all(4),
+                                                        decoration: const BoxDecoration(
+                                                          color: Colors.blue,
+                                                          shape: BoxShape.circle,
+                                                        ),
+                                                        child: const Icon(
+                                                          Icons.drag_handle,
+                                                          color: Colors.white,
+                                                          size: 16,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        );
+                                      },
                                     ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ],
-                              ),
-                            )
-                          : GridView.builder(
-                              padding: const EdgeInsets.all(16),
-                              gridDelegate:
-                                  const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 3,
-                                crossAxisSpacing: 16,
-                                mainAxisSpacing: 16,
-                                childAspectRatio: 1.2,
-                              ),
-                              itemCount: _composedWagons.length,
-                              itemBuilder: (context, index) {
-                                return WagonCard(
-                                  wagon: _composedWagons[index],
-                                );
-                              },
-                            ),
+                            );
+                          },
+                        ),
                 ),
               ],
             ),
@@ -605,13 +770,116 @@ class _ComposerScreenState extends State<ComposerScreen> {
                               padding: const EdgeInsets.symmetric(horizontal: 8),
                               itemCount: wagonProvider.wagons.length,
                               itemBuilder: (context, index) {
+                                final wagon = wagonProvider.wagons[index];
+                                final isSelected = _selectedWagonIds.contains(wagon.id);
                                 return Padding(
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 4,
                                     vertical: 4,
                                   ),
-                                  child: WagonCard(
-                                    wagon: wagonProvider.wagons[index],
+                                  child: Draggable<Wagon>(
+                                    data: wagon,
+                                    feedback: Material(
+                                      elevation: 8,
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Container(
+                                        width: 250,
+                                        padding: const EdgeInsets.all(12),
+                                        decoration: BoxDecoration(
+                                          color: Colors.blue.shade100,
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(
+                                            color: Colors.blue,
+                                            width: 2,
+                                          ),
+                                        ),
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              wagon.wagonNumber,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 18,
+                                                color: Colors.blue,
+                                              ),
+                                            ),
+                                            if (wagon.wagonType != null)
+                                              Text(
+                                                wagon.wagonType!.name,
+                                                style: const TextStyle(
+                                                  fontSize: 14,
+                                                  color: Colors.blue,
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                    childWhenDragging: Opacity(
+                                      opacity: 0.3,
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          border: Border.all(
+                                            color: isSelected
+                                                ? Colors.blue
+                                                : Colors.transparent,
+                                            width: 2,
+                                          ),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: WagonCard(wagon: wagon),
+                                      ),
+                                    ),
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        border: Border.all(
+                                          color: isSelected
+                                              ? Colors.blue
+                                              : Colors.transparent,
+                                          width: 2,
+                                        ),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Stack(
+                                        children: [
+                                          WagonCard(wagon: wagon),
+                                          if (isSelected)
+                                            Positioned(
+                                              top: 4,
+                                              right: 4,
+                                              child: Container(
+                                                padding: const EdgeInsets.all(4),
+                                                decoration: const BoxDecoration(
+                                                  color: Colors.blue,
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: const Icon(
+                                                  Icons.check,
+                                                  color: Colors.white,
+                                                  size: 16,
+                                                ),
+                                              ),
+                                            ),
+                                          Positioned(
+                                            bottom: 4,
+                                            right: 4,
+                                            child: Container(
+                                              padding: const EdgeInsets.all(6),
+                                              decoration: BoxDecoration(
+                                                color: Colors.blue.shade700,
+                                                borderRadius: BorderRadius.circular(20),
+                                              ),
+                                              child: const Icon(
+                                                Icons.drag_handle,
+                                                color: Colors.white,
+                                                size: 16,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   ),
                                 );
                               },

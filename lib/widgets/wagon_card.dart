@@ -37,13 +37,15 @@ class WagonCard extends StatelessWidget {
       case 'OK':
         return 'Исправен';
       case 'MINOR':
-        return 'Незначительные неисправности';
+        return 'Незначит.';
       case 'MAJOR':
-        return 'Значительные неисправности';
+        return 'Значит.';
       case 'OUT_OF_SERVICE':
-        return 'Не пригоден к эксплуатации';
+        return 'Не пригоден';
       default:
-        return wagon.conditionStatus;
+        return wagon.conditionStatus.length > 10
+            ? wagon.conditionStatus.substring(0, 10)
+            : wagon.conditionStatus;
     }
   }
 
@@ -51,29 +53,38 @@ class WagonCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       elevation: 2,
+      margin: EdgeInsets.zero,
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(12.0),
+          padding: const EdgeInsets.all(10.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
+              // Заголовок с номером и статусом
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    wagon.wagonNumber.isNotEmpty
-                        ? wagon.wagonNumber
-                        : 'Вагон',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                  Expanded(
+                    child: Text(
+                      wagon.wagonNumber.isNotEmpty
+                          ? wagon.wagonNumber
+                          : 'Вагон',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
                     ),
                   ),
+                  const SizedBox(width: 6),
                   Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
+                      horizontal: 6,
+                      vertical: 3,
                     ),
                     decoration: BoxDecoration(
                       color: _getStatusColor(),
@@ -83,24 +94,66 @@ class WagonCard extends StatelessWidget {
                       _getStatusText(),
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 12,
+                        fontSize: 10,
                       ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
+              // Компактная информация
               if (wagon.wagonType != null)
-                Text('Тип: ${wagon.wagonType!.name}'),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 2),
+                  child: Text(
+                    'Тип: ${wagon.wagonType!.name}',
+                    style: const TextStyle(fontSize: 11),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                ),
               if (wagon.cargoTypes != null && wagon.cargoTypes!.isNotEmpty)
-                Text(
-                  'Грузы: ${wagon.cargoTypes!.map((e) => e.name).join(", ")}',
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 2),
+                  child: Text(
+                    'Грузы: ${wagon.cargoTypes!.map((e) => e.name).join(", ")}',
+                    style: const TextStyle(fontSize: 11),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                ),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 2),
+                child: Text(
+                  'Путь: ${wagon.pathNumber}, Поз: ${wagon.position}',
+                  style: const TextStyle(fontSize: 11),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 2),
+                child: Text(
+                  'Д: ${wagon.length.toStringAsFixed(1)}м, В: ${wagon.height.toStringAsFixed(1)}м',
+                  style: const TextStyle(fontSize: 11),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+              ),
+              if (wagon.maxLoadWeight != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 2),
+                  child: Text(
+                    'Вес: ${wagon.maxLoadWeight!.toStringAsFixed(1)}т',
+                    style: const TextStyle(fontSize: 11),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
                 ),
               const SizedBox(height: 4),
-              Text('Путь: ${wagon.pathNumber}, Позиция: ${wagon.position}'),
-              Text('Длина: ${wagon.length}м, Высота: ${wagon.height}м'),
-              if (wagon.maxLoadWeight != null)
-                Text('Макс. вес: ${wagon.maxLoadWeight}т'),
+              // Статус готовности
               Row(
                 children: [
                   Icon(
@@ -108,38 +161,49 @@ class WagonCard extends StatelessWidget {
                         ? Icons.check_circle
                         : Icons.cancel,
                     color: wagon.isOperational ? Colors.green : Colors.red,
-                    size: 16,
+                    size: 14,
                   ),
                   const SizedBox(width: 4),
-                  Text(
-                    wagon.isOperational
-                        ? 'Готов к эксплуатации'
-                        : 'Не готов',
-                    style: TextStyle(
-                      color: wagon.isOperational ? Colors.green : Colors.red,
-                      fontSize: 12,
+                  Expanded(
+                    child: Text(
+                      wagon.isOperational
+                          ? 'Готов'
+                          : 'Не готов',
+                      style: TextStyle(
+                        color: wagon.isOperational ? Colors.green : Colors.red,
+                        fontSize: 11,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
                     ),
                   ),
                 ],
               ),
               if (showActions && (onEdit != null || onDelete != null))
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    if (onEdit != null)
-                      IconButton(
-                        icon: const Icon(Icons.edit),
-                        onPressed: onEdit,
-                        iconSize: 20,
-                      ),
-                    if (onDelete != null)
-                      IconButton(
-                        icon: const Icon(Icons.delete),
-                        onPressed: onDelete,
-                        iconSize: 20,
-                        color: Colors.red,
-                      ),
-                  ],
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      if (onEdit != null)
+                        IconButton(
+                          icon: const Icon(Icons.edit),
+                          onPressed: onEdit,
+                          iconSize: 18,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                      if (onDelete != null)
+                        IconButton(
+                          icon: const Icon(Icons.delete),
+                          onPressed: onDelete,
+                          iconSize: 18,
+                          color: Colors.red,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                    ],
+                  ),
                 ),
             ],
           ),
