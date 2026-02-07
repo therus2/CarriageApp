@@ -44,15 +44,19 @@ class _DispatcherInputScreenState extends State<DispatcherInputScreen> {
     final currentWagon = wagons[_currentIndex];
     final data = _formData[_currentIndex] ?? {};
 
-    final updatedWagon = Wagon(
+      final updatedWagon = Wagon(
       id: currentWagon.id,
       wagonNumber: (data['wagonNumber'] as String?) ?? currentWagon.wagonNumber,
       pathNumber: (data['pathNumber'] as int?) ?? currentWagon.pathNumber,
       position: (data['position'] as int?) ?? currentWagon.position,
       length: (data['length'] as double?) ?? currentWagon.length,
       height: (data['height'] as double?) ?? currentWagon.height,
-      maxLoadWeight:
-          (data['maxLoadWeight'] as double?) ?? currentWagon.maxLoadWeight,
+      loadCapacity: (data['loadCapacity'] as double?) ?? currentWagon.loadCapacity,
+      axleCount: (data['axleCount'] as int?) ?? currentWagon.axleCount,
+      netWeight: (data['netWeight'] as double?) ?? currentWagon.netWeight,
+      wagonWeight: (data['wagonWeight'] as double?) ?? currentWagon.wagonWeight,
+      bodyVolume: (data['bodyVolume'] as double?) ?? currentWagon.bodyVolume,
+      fillHeight: (data['fillHeight'] as double?) ?? currentWagon.fillHeight,
       arrivedAt: (data['arrivedAt'] as DateTime?) ?? currentWagon.arrivedAt,
       conditionStatus:
           (data['conditionStatus'] as String?) ?? currentWagon.conditionStatus,
@@ -60,17 +64,15 @@ class _DispatcherInputScreenState extends State<DispatcherInputScreen> {
           (data['isOperational'] as bool?) ?? currentWagon.isOperational,
       comment: (data['comment'] as String?) ?? currentWagon.comment,
       wagonTypeId: (data['wagonTypeId'] as int?) ?? currentWagon.wagonTypeId,
-      cargoTypeIds: (data['cargoTypeIds'] as List<int>?) ??
-          currentWagon.cargoTypeIds,
       firmId: (data['firmId'] as int?) ?? currentWagon.firmId,
-      climateConditionIds:
-          (data['climateConditionIds'] as List<int>?) ??
-              currentWagon.climateConditionIds,
+      cisternTypeId: (data['cisternTypeId'] as int?) ?? currentWagon.cisternTypeId,
+      conductorsId: (data['conductorsId'] as int?) ?? currentWagon.conductorsId,
+      canRollFromHill: (data['canRollFromHill'] as bool?) ?? currentWagon.canRollFromHill,
       // поля, которые читает backend, но здесь не редактируются напрямую
       wagonType: currentWagon.wagonType,
-      cargoTypes: currentWagon.cargoTypes,
       firm: currentWagon.firm,
-      climateConditions: currentWagon.climateConditions,
+      cisternType: currentWagon.cisternType,
+      conductors: currentWagon.conductors,
       createdBy: currentWagon.createdBy,
       createdAt: currentWagon.createdAt,
     );
@@ -85,14 +87,20 @@ class _DispatcherInputScreenState extends State<DispatcherInputScreen> {
       _formData[index] = {
         'wagonNumber': wagon.wagonNumber,
         'wagonTypeId': wagon.wagonTypeId ?? wagon.wagonType?.id,
-        'cargoTypeIds': wagon.cargoTypeIds ?? wagon.cargoTypes?.map((e) => e.id).toList() ?? [],
         'firmId': wagon.firmId ?? wagon.firm?.id,
         'pathNumber': wagon.pathNumber,
         'position': wagon.position,
         'length': wagon.length,
         'height': wagon.height,
-        'maxLoadWeight': wagon.maxLoadWeight,
-        'climateConditionIds': wagon.climateConditionIds ?? wagon.climateConditions?.map((e) => e.id).toList() ?? [],
+        'loadCapacity': wagon.loadCapacity,
+        'axleCount': wagon.axleCount,
+        'netWeight': wagon.netWeight,
+        'wagonWeight': wagon.wagonWeight,
+        'bodyVolume': wagon.bodyVolume,
+        'fillHeight': wagon.fillHeight,
+        'cisternTypeId': wagon.cisternTypeId ?? wagon.cisternType?.id,
+        'conductorsId': wagon.conductorsId ?? wagon.conductors?.id,
+        'canRollFromHill': wagon.canRollFromHill,
         'arrivedAt': wagon.arrivedAt,
         'conditionStatus': wagon.conditionStatus,
         'isOperational': wagon.isOperational,
@@ -234,53 +242,6 @@ class _DispatcherInputScreenState extends State<DispatcherInputScreen> {
                       ),
                     ),
                   const SizedBox(height: 16),
-                  // Типы грузов (множественный выбор)
-                  Text(
-                    'Типы грузов',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  referenceProvider.cargoTypes.isEmpty
-                      ? Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8.0),
-                          child: Text(
-                            'Типы грузов загружаются...',
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
-                                ?.copyWith(color: Colors.grey),
-                          ),
-                        )
-                      : Wrap(
-                          spacing: 8,
-                          children: referenceProvider.cargoTypes.map((cargo) {
-                            final selectedIds =
-                                (formData['cargoTypeIds'] as List<int>?) ??
-                                    <int>[];
-                            final isSelected = selectedIds.contains(cargo.id);
-                            return FilterChip(
-                              label: Text(cargo.name),
-                              selected: isSelected,
-                              onSelected: (selected) {
-                                setState(() {
-                                  _formData[_currentIndex] ??= {};
-                                  final list = List<int>.from(
-                                      selectedIds); // копия списка
-                                  if (selected) {
-                                    if (!list.contains(cargo.id)) {
-                                      list.add(cargo.id);
-                                    }
-                                  } else {
-                                    list.remove(cargo.id);
-                                  }
-                                  _formData[_currentIndex]!['cargoTypeIds'] =
-                                      list;
-                                });
-                              },
-                            );
-                          }).toList(),
-                        ),
-                  const SizedBox(height: 16),
                   DropdownButtonFormField<int>(
                     key: ValueKey('firmId_$_currentIndex'),
                     value: formData['firmId'] as int?,
@@ -413,11 +374,11 @@ class _DispatcherInputScreenState extends State<DispatcherInputScreen> {
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
-                    key: ValueKey('maxLoadWeight_$_currentIndex'),
+                    key: ValueKey('loadCapacity_$_currentIndex'),
                     initialValue:
-                        formData['maxLoadWeight']?.toString() ?? '',
+                        formData['loadCapacity']?.toString() ?? '',
                     decoration: const InputDecoration(
-                      labelText: 'Макс. вес груза (т)',
+                      labelText: 'Грузоподъёмность (т)',
                       border: OutlineInputBorder(),
                     ),
                     keyboardType:
@@ -425,60 +386,200 @@ class _DispatcherInputScreenState extends State<DispatcherInputScreen> {
                     onChanged: (value) {
                       setState(() {
                         _formData[_currentIndex] ??= {};
-                        _formData[_currentIndex]!['maxLoadWeight'] =
+                        _formData[_currentIndex]!['loadCapacity'] =
                             double.tryParse(value);
                       });
                     },
                   ),
                   const SizedBox(height: 16),
-                  // Климатические условия (множественный выбор)
-                  Text(
-                    'Климатические условия',
-                    style: Theme.of(context).textTheme.titleMedium,
+                  // Количество осей (обязательно для диспетчера)
+                  TextFormField(
+                    key: ValueKey('axleCount_$_currentIndex'),
+                    initialValue: formData['axleCount']?.toString() ?? '',
+                    decoration: const InputDecoration(
+                      labelText: 'Количество осей *',
+                      border: OutlineInputBorder(),
+                      helperText: 'Обязательно для диспетчера',
+                    ),
+                    keyboardType: TextInputType.number,
+                    onChanged: (value) {
+                      setState(() {
+                        _formData[_currentIndex] ??= {};
+                        _formData[_currentIndex]!['axleCount'] =
+                            int.tryParse(value);
+                      });
+                    },
                   ),
-                  const SizedBox(height: 8),
-                  referenceProvider.climateConditions.isEmpty
-                      ? Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8.0),
-                          child: Text(
-                            'Климатические условия загружаются...',
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
-                                ?.copyWith(color: Colors.grey),
-                          ),
-                        )
-                      : Wrap(
-                          spacing: 8,
-                          children: referenceProvider.climateConditions
-                              .map((condition) {
-                            final selectedIds = (formData['climateConditionIds']
-                                    as List<int>?) ??
-                                <int>[];
-                            final isSelected =
-                                selectedIds.contains(condition.id);
-                            return FilterChip(
-                              label: Text(condition.name),
-                              selected: isSelected,
-                              onSelected: (selected) {
-                                setState(() {
-                                  _formData[_currentIndex] ??= {};
-                                  final list = List<int>.from(
-                                      selectedIds); // копия списка
-                                  if (selected) {
-                                    if (!list.contains(condition.id)) {
-                                      list.add(condition.id);
-                                    }
-                                  } else {
-                                    list.remove(condition.id);
-                                  }
-                                  _formData[_currentIndex]![
-                                      'climateConditionIds'] = list;
-                                });
-                              },
-                            );
-                          }).toList(),
+                  const SizedBox(height: 16),
+                  // Масса нетто (необязательно)
+                  TextFormField(
+                    key: ValueKey('netWeight_$_currentIndex'),
+                    initialValue: formData['netWeight']?.toString() ?? '',
+                    decoration: const InputDecoration(
+                      labelText: 'Масса нетто (кг)',
+                      border: OutlineInputBorder(),
+                      helperText: 'Необязательно',
+                    ),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    onChanged: (value) {
+                      setState(() {
+                        _formData[_currentIndex] ??= {};
+                        _formData[_currentIndex]!['netWeight'] =
+                            double.tryParse(value);
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  // Масса вагона (обязательно для диспетчера)
+                  TextFormField(
+                    key: ValueKey('wagonWeight_$_currentIndex'),
+                    initialValue: formData['wagonWeight']?.toString() ?? '',
+                    decoration: const InputDecoration(
+                      labelText: 'Масса вагона (кг) *',
+                      border: OutlineInputBorder(),
+                      helperText: 'Обязательно для диспетчера',
+                    ),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    onChanged: (value) {
+                      setState(() {
+                        _formData[_currentIndex] ??= {};
+                        _formData[_currentIndex]!['wagonWeight'] =
+                            double.tryParse(value);
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  // Объём кузова (необязательно)
+                  TextFormField(
+                    key: ValueKey('bodyVolume_$_currentIndex'),
+                    initialValue: formData['bodyVolume']?.toString() ?? '',
+                    decoration: const InputDecoration(
+                      labelText: 'Объём кузова (м³)',
+                      border: OutlineInputBorder(),
+                      helperText: 'Необязательно',
+                    ),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    onChanged: (value) {
+                      setState(() {
+                        _formData[_currentIndex] ??= {};
+                        _formData[_currentIndex]!['bodyVolume'] =
+                            double.tryParse(value);
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  // Проводники (необязательно) - выпадающий список
+                  DropdownButtonFormField<int>(
+                    key: ValueKey('conductorsId_$_currentIndex'),
+                    value: formData['conductorsId'] as int?,
+                    decoration: InputDecoration(
+                      labelText: 'Проводники (охранники, полиция и т.д.)',
+                      border: const OutlineInputBorder(),
+                      helperText: 'Необязательно',
+                      hintText: referenceProvider.conductors.isEmpty
+                          ? 'Загрузка...'
+                          : 'Выберите проводника',
+                    ),
+                    items: [
+                      const DropdownMenuItem<int>(
+                        value: null,
+                        child: Text('Нет'),
+                      ),
+                      ...referenceProvider.conductors
+                          .map(
+                            (conductor) => DropdownMenuItem<int>(
+                              value: conductor.id,
+                              child: Text(conductor.name),
+                            ),
+                          )
+                          .toList(),
+                    ],
+                    onChanged: referenceProvider.conductors.isEmpty
+                        ? null
+                        : (value) {
+                            setState(() {
+                              _formData[_currentIndex] ??= {};
+                              _formData[_currentIndex]!['conductorsId'] = value;
+                            });
+                          },
+                  ),
+                  const SizedBox(height: 16),
+                  // Поля для цистерн (показываются только если тип вагона - цистерна)
+                  if (formData['wagonTypeId'] != null &&
+                      referenceProvider.wagonTypes
+                          .any((wt) => wt.id == formData['wagonTypeId'] &&
+                              wt.name.toLowerCase().contains('цистерн'))) ...[
+                    TextFormField(
+                      key: ValueKey('fillHeight_$_currentIndex'),
+                      initialValue: formData['fillHeight']?.toString() ?? '',
+                      decoration: const InputDecoration(
+                        labelText: 'Высота налива (см)',
+                        border: OutlineInputBorder(),
+                        helperText: 'Только для цистерн, необязательно',
+                      ),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      onChanged: (value) {
+                        setState(() {
+                          _formData[_currentIndex] ??= {};
+                          _formData[_currentIndex]!['fillHeight'] =
+                              double.tryParse(value);
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    // Тип цистерны - выпадающий список
+                    DropdownButtonFormField<int>(
+                      key: ValueKey('cisternTypeId_$_currentIndex'),
+                      value: formData['cisternTypeId'] as int?,
+                      decoration: InputDecoration(
+                        labelText: 'Тип цистерны',
+                        border: const OutlineInputBorder(),
+                        helperText: 'Только для цистерн, необязательно',
+                        hintText: referenceProvider.cisternTypes.isEmpty
+                            ? 'Загрузка...'
+                            : 'Выберите тип цистерны',
+                      ),
+                      items: [
+                        const DropdownMenuItem<int>(
+                          value: null,
+                          child: Text('Не указано'),
                         ),
+                        ...referenceProvider.cisternTypes
+                            .map(
+                              (cisternType) => DropdownMenuItem<int>(
+                                value: cisternType.id,
+                                child: Text(cisternType.name),
+                              ),
+                            )
+                            .toList(),
+                      ],
+                      onChanged: referenceProvider.cisternTypes.isEmpty
+                          ? null
+                          : (value) {
+                              setState(() {
+                                _formData[_currentIndex] ??= {};
+                                _formData[_currentIndex]!['cisternTypeId'] = value;
+                              });
+                            },
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  const SizedBox(height: 16),
+                  // Можно ли вагон скатывать с горки
+                  SwitchListTile(
+                    title: const Text('Можно скатывать с горки'),
+                    value: (formData['canRollFromHill'] as bool?) ?? true,
+                    onChanged: (value) {
+                      setState(() {
+                        _formData[_currentIndex] ??= {};
+                        _formData[_currentIndex]!['canRollFromHill'] = value;
+                      });
+                    },
+                  ),
                   const SizedBox(height: 16),
                   // Дата и время прибытия
                   Builder(

@@ -114,16 +114,6 @@ class WagonCard extends StatelessWidget {
                     maxLines: 1,
                   ),
                 ),
-              if (wagon.cargoTypes != null && wagon.cargoTypes!.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 2),
-                  child: Text(
-                    'Грузы: ${wagon.cargoTypes!.map((e) => e.name).join(", ")}',
-                    style: const TextStyle(fontSize: 11),
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
-                  ),
-                ),
               Padding(
                 padding: const EdgeInsets.only(bottom: 2),
                 child: Text(
@@ -136,17 +126,27 @@ class WagonCard extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(bottom: 2),
                 child: Text(
-                  'Д: ${wagon.length.toStringAsFixed(1)}м, В: ${wagon.height.toStringAsFixed(1)}м',
+                  'Д: ${wagon.length?.toStringAsFixed(1) ?? '?'}м, В: ${wagon.height?.toStringAsFixed(1) ?? '?'}м',
                   style: const TextStyle(fontSize: 11),
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
                 ),
               ),
-              if (wagon.maxLoadWeight != null)
+              if (wagon.loadCapacity != null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 2),
                   child: Text(
-                    'Вес: ${wagon.maxLoadWeight!.toStringAsFixed(1)}т',
+                    'Грузоподъёмность: ${wagon.loadCapacity!.toStringAsFixed(1)}т',
+                    style: const TextStyle(fontSize: 11),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                ),
+              if (wagon.axleCount != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 2),
+                  child: Text(
+                    'Оси: ${wagon.axleCount}',
                     style: const TextStyle(fontSize: 11),
                     overflow: TextOverflow.ellipsis,
                     maxLines: 1,

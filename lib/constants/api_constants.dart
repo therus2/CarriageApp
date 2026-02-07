@@ -11,7 +11,8 @@ class ApiConstants {
   // Reference endpoints
   static const String wagonTypesEndpoint = '/api/wagon-types/';
   static const String cargoTypesEndpoint = '/api/cargo-types/';
-  static const String climateConditionsEndpoint = '/api/climate-conditions/';
+  static const String cisternTypesEndpoint = '/api/cistern-types/';
+  static const String conductorsEndpoint = '/api/conductors/';
   static const String firmsEndpoint = '/api/firms/';
   static const String stationConfigEndpoint = '/api/station-config/';
 
@@ -21,4 +22,5 @@ class ApiConstants {
 
   // Compose endpoint
   static const String composeEndpoint = '/api/compose/';
+  static const String composeSaveEndpoint = '/api/compose/save/';
 }

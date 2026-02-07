@@ -6,6 +6,7 @@ import 'providers/wagon_provider.dart';
 import 'providers/reference_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_menu_screen.dart';
+import 'theme/app_theme.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -33,10 +34,7 @@ class MyApp extends StatelessWidget {
       child: MaterialApp(
         title: 'Система учёта вагонов',
         debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          primarySwatch: Colors.blue,
-          useMaterial3: true,
-        ),
+        theme: AppTheme.lightTheme,
         home: const AuthWrapper(),
       ),
     );

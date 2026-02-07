@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:open_file/open_file.dart';
 import '../providers/wagon_provider.dart';
 import '../providers/reference_provider.dart';
 import '../widgets/wagon_card.dart';
@@ -22,21 +25,51 @@ class _ComposerScreenState extends State<ComposerScreen> {
   Set<int> _selectedWagonIds = {}; // ID выбранных вагонов для визуального выделения
   String? _composeError;
   double? _totalLength;
+  bool _isSaving = false;
 
   // Форма для добавления нового требования
   int? _selectedWagonTypeId;
-  int? _selectedCargoTypeId;
   int? _selectedFirmId;
   final _countController = TextEditingController(text: '1');
-  final List<int> _selectedClimateConditionIds = [];
-  final _maxLoadWeightController = TextEditingController();
+  final _loadCapacityMinController = TextEditingController();
+  final _loadCapacityMaxController = TextEditingController();
+  final _axleCountController = TextEditingController();
+  final _wagonWeightMinController = TextEditingController();
+  final _wagonWeightMaxController = TextEditingController();
+  final _netWeightMinController = TextEditingController();
+  final _netWeightMaxController = TextEditingController();
+  final _bodyVolumeMinController = TextEditingController();
+  final _bodyVolumeMaxController = TextEditingController();
+  bool? _canRollFromHill;
+  String? _conditionStatus;
+  int? _selectedCisternTypeId;
+  final _fillHeightMinController = TextEditingController();
+  final _fillHeightMaxController = TextEditingController();
+  
+  // Параметры сопровождения состава (не для фильтрации)
+  int? _selectedCompositionConductorsId;
+  
+  // Состояние раскрывающихся секций
+  bool _showAdditionalParams = false;
+  bool _showCisternParams = false;
+  bool _showCompositionParams = false;
 
   @override
   void dispose() {
     _maxTotalLengthController.dispose();
     _totalWagonsCountController.dispose();
     _countController.dispose();
-    _maxLoadWeightController.dispose();
+    _loadCapacityMinController.dispose();
+    _loadCapacityMaxController.dispose();
+    _axleCountController.dispose();
+    _wagonWeightMinController.dispose();
+    _wagonWeightMaxController.dispose();
+    _netWeightMinController.dispose();
+    _netWeightMaxController.dispose();
+    _bodyVolumeMinController.dispose();
+    _bodyVolumeMaxController.dispose();
+    _fillHeightMinController.dispose();
+    _fillHeightMaxController.dispose();
     super.dispose();
   }
 
@@ -46,15 +79,15 @@ class _ComposerScreenState extends State<ComposerScreen> {
     final wagonProvider = Provider.of<WagonProvider>(context, listen: false);
     final referenceProvider =
         Provider.of<ReferenceProvider>(context, listen: false);
-    wagonProvider.loadWagons(isOperational: true);
+    wagonProvider.loadWagons(isOperational: true, excludeInConsist: true);
     referenceProvider.loadAllReferences();
   }
 
   void _addComposeItem() {
-    if (_selectedWagonTypeId == null || _selectedCargoTypeId == null) {
+    if (_selectedWagonTypeId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Выберите тип вагона и тип груза'),
+          content: Text('Выберите тип вагона'),
           backgroundColor: Colors.red,
         ),
       );
@@ -73,23 +106,61 @@ class _ComposerScreenState extends State<ComposerScreen> {
     }
 
     setState(() {
-      _composeItems.add({
+      // Только параметры фильтрации (без conductors_id)
+      final item = {
         'wagon_type': _selectedWagonTypeId,
-        'cargo_type': _selectedCargoTypeId,
         'count': count,
-        'climate_conditions': List<int>.from(_selectedClimateConditionIds),
         if (_selectedFirmId != null) 'firm': _selectedFirmId,
-        if (_maxLoadWeightController.text.isNotEmpty)
-          'max_load_weight': double.tryParse(_maxLoadWeightController.text),
-      });
+        if (_loadCapacityMinController.text.isNotEmpty)
+          'load_capacity_min': double.tryParse(_loadCapacityMinController.text),
+        if (_loadCapacityMaxController.text.isNotEmpty)
+          'load_capacity_max': double.tryParse(_loadCapacityMaxController.text),
+        if (_axleCountController.text.isNotEmpty)
+          'axle_count': int.tryParse(_axleCountController.text),
+        if (_wagonWeightMinController.text.isNotEmpty)
+          'wagon_weight_min': double.tryParse(_wagonWeightMinController.text),
+        if (_wagonWeightMaxController.text.isNotEmpty)
+          'wagon_weight_max': double.tryParse(_wagonWeightMaxController.text),
+        if (_netWeightMinController.text.isNotEmpty)
+          'net_weight_min': double.tryParse(_netWeightMinController.text),
+        if (_netWeightMaxController.text.isNotEmpty)
+          'net_weight_max': double.tryParse(_netWeightMaxController.text),
+        if (_bodyVolumeMinController.text.isNotEmpty)
+          'body_volume_min': double.tryParse(_bodyVolumeMinController.text),
+        if (_bodyVolumeMaxController.text.isNotEmpty)
+          'body_volume_max': double.tryParse(_bodyVolumeMaxController.text),
+        if (_canRollFromHill != null) 'can_roll_from_hill': _canRollFromHill,
+        if (_conditionStatus != null) 'condition_status': _conditionStatus,
+        if (_selectedCisternTypeId != null) 'cistern_type_id': _selectedCisternTypeId,
+        if (_fillHeightMinController.text.isNotEmpty)
+          'fill_height_min': double.tryParse(_fillHeightMinController.text),
+        if (_fillHeightMaxController.text.isNotEmpty)
+          'fill_height_max': double.tryParse(_fillHeightMaxController.text),
+      };
+      
+      _composeItems.add(item);
 
-      // Сброс формы
+      // Сброс формы (только параметры фильтрации)
       _selectedWagonTypeId = null;
-      _selectedCargoTypeId = null;
       _selectedFirmId = null;
       _countController.text = '1';
-      _selectedClimateConditionIds.clear();
-      _maxLoadWeightController.clear();
+      _loadCapacityMinController.clear();
+      _loadCapacityMaxController.clear();
+      _axleCountController.clear();
+      _wagonWeightMinController.clear();
+      _wagonWeightMaxController.clear();
+      _netWeightMinController.clear();
+      _netWeightMaxController.clear();
+      _bodyVolumeMinController.clear();
+      _bodyVolumeMaxController.clear();
+      _canRollFromHill = null;
+      _conditionStatus = null;
+      _selectedCisternTypeId = null;
+      _fillHeightMinController.clear();
+      _fillHeightMaxController.clear();
+      _showAdditionalParams = false;
+      _showCisternParams = false;
+      // Параметры сопровождения НЕ сбрасываются - они для всего состава
     });
   }
 
@@ -136,6 +207,7 @@ class _ComposerScreenState extends State<ComposerScreen> {
       _composeItems,
       maxTotalLength: maxTotalLength,
       totalWagonsCount: totalWagonsCount,
+      conductorsId: _selectedCompositionConductorsId,
     );
 
     if (!mounted) return;
@@ -156,18 +228,34 @@ class _ComposerScreenState extends State<ComposerScreen> {
       });
 
       if (data['errors'] != null && (data['errors'] as List).isNotEmpty) {
-        final errorMessages = (data['errors'] as List)
+        final errors = data['errors'] as List;
+        final errorMessages = errors
             .map((e) => e['message'] ?? e.toString())
             .join('\n');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Состав подобран с предупреждениями:\n$errorMessages',
+        
+        // Проверяем, есть ли предложения альтернативных вагонов
+        bool hasAlternatives = false;
+        for (var error in errors) {
+          if (error['alternatives'] != null && (error['alternatives'] as List).isNotEmpty) {
+            hasAlternatives = true;
+            break;
+          }
+        }
+        
+        if (hasAlternatives) {
+          // Показываем диалог с предложениями
+          _showAlternativesDialog(errors);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Состав подобран с предупреждениями:\n$errorMessages',
+              ),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 7),
             ),
-            backgroundColor: Colors.orange,
-            duration: const Duration(seconds: 7),
-          ),
-        );
+          );
+        }
       } else {
         final requestedCount = data['requested_count'];
         final actualCount = _composedWagons.length;
@@ -196,6 +284,276 @@ class _ComposerScreenState extends State<ComposerScreen> {
     }
   }
 
+  Future<void> _showAlternativesDialog(List<dynamic> errors) async {
+    // Находим ошибки с предложениями
+    final errorsWithAlternatives = errors.where((e) => 
+      e['alternatives'] != null && (e['alternatives'] as List).isNotEmpty
+    ).toList();
+    
+    if (errorsWithAlternatives.isEmpty) return;
+    
+    // Показываем диалог для каждого типа вагонов с предложениями
+    for (var error in errorsWithAlternatives) {
+      final alternatives = (error['alternatives'] as List)
+          .map((w) => Wagon.fromJson(w as Map<String, dynamic>))
+          .toList();
+      final wagonTypeName = error['wagon_type_name'] ?? 'неизвестный тип';
+      final message = error['message'] ?? '';
+      
+      if (alternatives.isEmpty) continue;
+      
+      await _showWagonSelectionDialog(alternatives, wagonTypeName, message);
+    }
+  }
+  
+  Future<void> _showWagonSelectionDialog(
+    List<Wagon> alternatives, 
+    String wagonTypeName,
+    String message,
+  ) async {
+    final selectedWagons = <Wagon>[];
+    
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text('Предложения для типа "$wagonTypeName"'),
+          content: SizedBox(
+            width: 600,
+            height: 500,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  message,
+                  style: const TextStyle(fontSize: 14, color: Colors.orange),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Доступные альтернативные вагоны:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: alternatives.length,
+                    itemBuilder: (context, index) {
+                      final wagon = alternatives[index];
+                      final isSelected = selectedWagons.contains(wagon);
+                      
+                      return Card(
+                        margin: const EdgeInsets.symmetric(vertical: 4),
+                        child: CheckboxListTile(
+                          title: Text('Вагон ${wagon.wagonNumber}'),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Путь: ${wagon.pathNumber}, Поз: ${wagon.position}'),
+                              if (wagon.loadCapacity != null)
+                                Text('Грузоподъёмность: ${wagon.loadCapacity} т'),
+                              if (wagon.axleCount != null)
+                                Text('Оси: ${wagon.axleCount}'),
+                              if (wagon.wagonWeight != null)
+                                Text('Масса вагона: ${wagon.wagonWeight} кг'),
+                            ],
+                          ),
+                          value: isSelected,
+                          onChanged: (value) {
+                            setDialogState(() {
+                              if (value == true) {
+                                selectedWagons.add(wagon);
+                              } else {
+                                selectedWagons.remove(wagon);
+                              }
+                            });
+                          },
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Пропустить'),
+            ),
+            ElevatedButton(
+              onPressed: selectedWagons.isEmpty
+                  ? null
+                  : () {
+                      // Добавляем выбранные вагоны в состав
+                      setState(() {
+                        _composedWagons.addAll(selectedWagons);
+                        _totalLength = (_totalLength ?? 0) + 
+                            selectedWagons.fold(0.0, (sum, w) => sum + (w.length ?? 0));
+                        // Обновляем список доступных вагонов
+                        final wagonProvider = Provider.of<WagonProvider>(context, listen: false);
+                        wagonProvider.loadWagons(isOperational: true, excludeInConsist: true);
+                      });
+                      Navigator.of(context).pop();
+                      
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Добавлено ${selectedWagons.length} вагонов в состав',
+                          ),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    },
+              child: const Text('Добавить в состав'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _saveCompose() async {
+    if (_composedWagons.isEmpty || _isSaving) return;
+
+    // Показываем диалог подтверждения
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Сохранить состав?'),
+          content: SizedBox(
+            width: 500,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Вы хотите сохранить и показать информацию о составе который получился?',
+                    style: TextStyle(fontSize: 16),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Состав:',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  ..._composedWagons.asMap().entries.map(
+                    (entry) {
+                      final index = entry.key;
+                      final wagon = entry.value;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Text(
+                          '${index + 1}. Вагон ${wagon.wagonNumber} (Путь ${wagon.pathNumber}, Позиция ${wagon.position})',
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Отмена'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Да'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm != true) return;
+
+    setState(() {
+      _isSaving = true;
+    });
+
+    try {
+      final apiService = ApiService();
+      final wagonIds = _composedWagons
+          .where((w) => w.id != null)
+          .map((w) => w.id!)
+          .toList();
+
+      if (wagonIds.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Нет вагонов для сохранения'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      final response = await apiService.saveCompose(
+        wagonIds,
+        conductorsId: _selectedCompositionConductorsId,
+      );
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        // Сохраняем PDF файл
+        final bytes = response.bodyBytes;
+        final directory = Platform.isAndroid
+            ? await getExternalStorageDirectory()
+            : await getDownloadsDirectory();
+        
+        if (directory != null) {
+          final file = File('${directory.path}/Состав_${DateTime.now().millisecondsSinceEpoch}.pdf');
+          await file.writeAsBytes(bytes);
+          
+          // Открываем файл
+          await OpenFile.open(file.path);
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('PDF файл сохранён: ${file.path}'),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 5),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('PDF файл успешно сформирован и скачан'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка сохранения состава: ${response.statusCode}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Ошибка сохранения состава: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final referenceProvider = Provider.of<ReferenceProvider>(context);
@@ -203,10 +561,29 @@ class _ComposerScreenState extends State<ComposerScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Создание состава'),
+        title: const Text(
+          'Создание состава',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
+        ),
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Colors.blue.shade700, Colors.blue.shade500],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        elevation: 4,
+        iconTheme: const IconThemeData(color: Colors.white),
+        titleTextStyle: const TextStyle(
+          color: Colors.white,
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
         ),
       ),
       body: Row(
@@ -215,16 +592,39 @@ class _ComposerScreenState extends State<ComposerScreen> {
           Container(
             width: 350,
             decoration: BoxDecoration(
-              border: Border(right: BorderSide(color: Colors.grey.shade300)),
+              color: Colors.blue.shade50,
+              border: Border(right: BorderSide(color: Colors.blue.shade200, width: 2)),
             ),
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text(
-                    'Параметры подбора',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Colors.blue.shade600, Colors.blue.shade400],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.blue.shade300,
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Text(
+                      'Параметры подбора',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 16),
                   // ГЛАВНЫЙ ПАРАМЕТР: Количество вагонов в составе
@@ -252,15 +652,37 @@ class _ComposerScreenState extends State<ComposerScreen> {
                   // Тип вагона
                   DropdownButtonFormField<int>(
                     value: _selectedWagonTypeId,
-                    decoration: const InputDecoration(
+                    isExpanded: true,
+                    decoration: InputDecoration(
                       labelText: 'Тип вагона *',
-                      border: OutlineInputBorder(),
+                      labelStyle: TextStyle(color: Colors.blue.shade700),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: Colors.blue.shade300),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: Colors.blue.shade300),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: Colors.blue.shade600, width: 2),
+                      ),
+                      filled: true,
+                      fillColor: Colors.white,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     ),
+                    dropdownColor: Colors.white,
+                    style: const TextStyle(color: Colors.black87),
+                    icon: Icon(Icons.arrow_drop_down, color: Colors.blue.shade700),
                     items: referenceProvider.wagonTypes
                         .map(
                           (type) => DropdownMenuItem<int>(
                             value: type.id,
-                            child: Text(type.name),
+                            child: Text(
+                              type.name,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         )
                         .toList(),
@@ -271,35 +693,32 @@ class _ComposerScreenState extends State<ComposerScreen> {
                     },
                   ),
                   const SizedBox(height: 16),
-                  // Тип груза
-                  DropdownButtonFormField<int>(
-                    value: _selectedCargoTypeId,
-                    decoration: const InputDecoration(
-                      labelText: 'Тип груза *',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: referenceProvider.cargoTypes
-                        .map(
-                          (cargo) => DropdownMenuItem<int>(
-                            value: cargo.id,
-                            child: Text(cargo.name),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedCargoTypeId = value;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 16),
                   // Фирма
                   DropdownButtonFormField<int>(
                     value: _selectedFirmId,
-                    decoration: const InputDecoration(
+                    isExpanded: true,
+                    decoration: InputDecoration(
                       labelText: 'Фирма (опционально)',
-                      border: OutlineInputBorder(),
+                      labelStyle: TextStyle(color: Colors.blue.shade700),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: Colors.blue.shade300),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: Colors.blue.shade300),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: Colors.blue.shade600, width: 2),
+                      ),
+                      filled: true,
+                      fillColor: Colors.white,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     ),
+                    dropdownColor: Colors.white,
+                    style: const TextStyle(color: Colors.black87),
+                    icon: Icon(Icons.arrow_drop_down, color: Colors.blue.shade700),
                     items: [
                       const DropdownMenuItem<int>(
                         value: null,
@@ -309,7 +728,10 @@ class _ComposerScreenState extends State<ComposerScreen> {
                           .map(
                             (firm) => DropdownMenuItem<int>(
                               value: firm.id,
-                              child: Text('${firm.name} (${firm.country})'),
+                              child: Text(
+                                '${firm.name} (${firm.country})',
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                           )
                           .toList(),
@@ -331,53 +753,724 @@ class _ComposerScreenState extends State<ComposerScreen> {
                     keyboardType: TextInputType.number,
                   ),
                   const SizedBox(height: 16),
-                  // Климатические условия
-                  const Text(
-                    'Климатические условия (опционально)',
-                    style: TextStyle(fontWeight: FontWeight.w500),
+                  // Грузоподъёмность (диапазон)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: _loadCapacityMinController,
+                          decoration: InputDecoration(
+                            labelText: 'Грузоподъёмность от (т)',
+                            labelStyle: TextStyle(color: Colors.blue.shade700),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(color: Colors.blue.shade300),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(color: Colors.blue.shade300),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(color: Colors.blue.shade600, width: 2),
+                            ),
+                            filled: true,
+                            fillColor: Colors.white,
+                            helperText: 'Мин.',
+                            helperStyle: TextStyle(color: Colors.blue.shade600),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          ),
+                          keyboardType:
+                              const TextInputType.numberWithOptions(decimal: true),
+                          style: const TextStyle(color: Colors.black87),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextFormField(
+                          controller: _loadCapacityMaxController,
+                          decoration: InputDecoration(
+                            labelText: 'Грузоподъёмность до (т)',
+                            labelStyle: TextStyle(color: Colors.blue.shade700),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(color: Colors.blue.shade300),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(color: Colors.blue.shade300),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(color: Colors.blue.shade600, width: 2),
+                            ),
+                            filled: true,
+                            fillColor: Colors.white,
+                            helperText: 'Макс.',
+                            helperStyle: TextStyle(color: Colors.blue.shade600),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          ),
+                          keyboardType:
+                              const TextInputType.numberWithOptions(decimal: true),
+                          style: const TextStyle(color: Colors.black87),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    children: referenceProvider.climateConditions.map((condition) {
-                      final isSelected =
-                          _selectedClimateConditionIds.contains(condition.id);
-                      return FilterChip(
-                        label: Text(condition.name),
-                        selected: isSelected,
-                        onSelected: (selected) {
+                  const SizedBox(height: 16),
+                  // Раскрывающаяся секция "Дополнительные параметры"
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.blue.shade200),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.blue.shade100,
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: ExpansionTile(
+                      title: Text(
+                        'Дополнительные параметры',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.blue.shade700,
+                        ),
+                      ),
+                      leading: Icon(Icons.tune, color: Colors.blue.shade600),
+                      iconColor: Colors.blue.shade600,
+                      collapsedIconColor: Colors.blue.shade400,
+                      initiallyExpanded: _showAdditionalParams,
+                      onExpansionChanged: (expanded) {
+                        setState(() {
+                          _showAdditionalParams = expanded;
+                        });
+                      },
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          children: [
+                            // Количество осей
+                            TextFormField(
+                              controller: _axleCountController,
+                              decoration: InputDecoration(
+                                labelText: 'Количество осей',
+                                labelStyle: TextStyle(color: Colors.blue.shade700),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: BorderSide(color: Colors.blue.shade300),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: BorderSide(color: Colors.blue.shade300),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: BorderSide(color: Colors.blue.shade600, width: 2),
+                                ),
+                                filled: true,
+                                fillColor: Colors.white,
+                                helperText: 'Опционально',
+                                helperStyle: TextStyle(color: Colors.blue.shade600),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              ),
+                              keyboardType: TextInputType.number,
+                              style: const TextStyle(color: Colors.black87),
+                            ),
+                            const SizedBox(height: 16),
+                            // Масса вагона (диапазон)
+                            const Text(
+                              'Масса вагона (кг)',
+                              style: TextStyle(fontWeight: FontWeight.w500),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextFormField(
+                                    controller: _wagonWeightMinController,
+                                    decoration: InputDecoration(
+                                      labelText: 'От (кг)',
+                                      labelStyle: TextStyle(color: Colors.blue.shade700),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: BorderSide(color: Colors.blue.shade300),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: BorderSide(color: Colors.blue.shade300),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: BorderSide(color: Colors.blue.shade600, width: 2),
+                                      ),
+                                      filled: true,
+                                      fillColor: Colors.white,
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    ),
+                                    keyboardType: const TextInputType.numberWithOptions(
+                                        decimal: true),
+                                    style: const TextStyle(color: Colors.black87),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: TextFormField(
+                                    controller: _wagonWeightMaxController,
+                                    decoration: InputDecoration(
+                                      labelText: 'До (кг)',
+                                      labelStyle: TextStyle(color: Colors.blue.shade700),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: BorderSide(color: Colors.blue.shade300),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: BorderSide(color: Colors.blue.shade300),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: BorderSide(color: Colors.blue.shade600, width: 2),
+                                      ),
+                                      filled: true,
+                                      fillColor: Colors.white,
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    ),
+                                    keyboardType: const TextInputType.numberWithOptions(
+                                        decimal: true),
+                                    style: const TextStyle(color: Colors.black87),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            // Масса нетто (диапазон)
+                            const Text(
+                              'Масса нетто (кг)',
+                              style: TextStyle(fontWeight: FontWeight.w500),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextFormField(
+                                    controller: _netWeightMinController,
+                                    decoration: InputDecoration(
+                                      labelText: 'От (кг)',
+                                      labelStyle: TextStyle(color: Colors.blue.shade700),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: BorderSide(color: Colors.blue.shade300),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: BorderSide(color: Colors.blue.shade300),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: BorderSide(color: Colors.blue.shade600, width: 2),
+                                      ),
+                                      filled: true,
+                                      fillColor: Colors.white,
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    ),
+                                    keyboardType: const TextInputType.numberWithOptions(
+                                        decimal: true),
+                                    style: const TextStyle(color: Colors.black87),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: TextFormField(
+                                    controller: _netWeightMaxController,
+                                    decoration: InputDecoration(
+                                      labelText: 'До (кг)',
+                                      labelStyle: TextStyle(color: Colors.blue.shade700),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: BorderSide(color: Colors.blue.shade300),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: BorderSide(color: Colors.blue.shade300),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: BorderSide(color: Colors.blue.shade600, width: 2),
+                                      ),
+                                      filled: true,
+                                      fillColor: Colors.white,
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    ),
+                                    keyboardType: const TextInputType.numberWithOptions(
+                                        decimal: true),
+                                    style: const TextStyle(color: Colors.black87),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            // Объём кузова (диапазон)
+                            const Text(
+                              'Объём кузова (м³)',
+                              style: TextStyle(fontWeight: FontWeight.w500),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextFormField(
+                                    controller: _bodyVolumeMinController,
+                                    decoration: const InputDecoration(
+                                      labelText: 'От (м³)',
+                                      border: OutlineInputBorder(),
+                                    ),
+                                    keyboardType: const TextInputType.numberWithOptions(
+                                        decimal: true),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: TextFormField(
+                                    controller: _bodyVolumeMaxController,
+                                    decoration: const InputDecoration(
+                                      labelText: 'До (м³)',
+                                      border: OutlineInputBorder(),
+                                    ),
+                                    keyboardType: const TextInputType.numberWithOptions(
+                                        decimal: true),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            // Можно скатывать с горки
+                            DropdownButtonFormField<bool>(
+                              value: _canRollFromHill,
+                              isExpanded: true,
+                              decoration: InputDecoration(
+                                labelText: 'Можно скатывать с горки',
+                                labelStyle: TextStyle(color: Colors.blue.shade700),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: BorderSide(color: Colors.blue.shade300),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: BorderSide(color: Colors.blue.shade300),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: BorderSide(color: Colors.blue.shade600, width: 2),
+                                ),
+                                filled: true,
+                                fillColor: Colors.white,
+                                helperText: 'Опционально',
+                                helperStyle: TextStyle(color: Colors.blue.shade600),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              ),
+                              dropdownColor: Colors.white,
+                              style: const TextStyle(color: Colors.black87),
+                              icon: Icon(Icons.arrow_drop_down, color: Colors.blue.shade700),
+                              items: const [
+                                DropdownMenuItem<bool>(
+                                  value: null,
+                                  child: Text('Не важно'),
+                                ),
+                                DropdownMenuItem<bool>(
+                                  value: true,
+                                  child: Text('Да'),
+                                ),
+                                DropdownMenuItem<bool>(
+                                  value: false,
+                                  child: Text('Нет'),
+                                ),
+                              ],
+                              onChanged: (value) {
+                                setState(() {
+                                  _canRollFromHill = value;
+                                });
+                              },
+                            ),
+                            const SizedBox(height: 16),
+                            // Техническое состояние
+                            DropdownButtonFormField<String>(
+                              value: _conditionStatus,
+                              isExpanded: true,
+                              decoration: InputDecoration(
+                                labelText: 'Техническое состояние',
+                                labelStyle: TextStyle(color: Colors.blue.shade700),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: BorderSide(color: Colors.blue.shade300),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: BorderSide(color: Colors.blue.shade300),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: BorderSide(color: Colors.blue.shade600, width: 2),
+                                ),
+                                filled: true,
+                                fillColor: Colors.white,
+                                helperText: 'Опционально',
+                                helperStyle: TextStyle(color: Colors.blue.shade600),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              ),
+                              dropdownColor: Colors.white,
+                              style: const TextStyle(color: Colors.black87),
+                              icon: Icon(Icons.arrow_drop_down, color: Colors.blue.shade700),
+                              items: const [
+                                DropdownMenuItem<String>(
+                                  value: null,
+                                  child: Text('Любое'),
+                                ),
+                                DropdownMenuItem<String>(
+                                  value: 'OK',
+                                  child: Text('Исправен'),
+                                ),
+                                DropdownMenuItem<String>(
+                                  value: 'MINOR',
+                                  child: Text('Незначительные неисправности'),
+                                ),
+                                DropdownMenuItem<String>(
+                                  value: 'MAJOR',
+                                  child: Text('Значительные неисправности'),
+                                ),
+                                DropdownMenuItem<String>(
+                                  value: 'OUT_OF_SERVICE',
+                                  child: Text('Не пригоден к эксплуатации'),
+                                ),
+                              ],
+                              onChanged: (value) {
+                                setState(() {
+                                  _conditionStatus = value;
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  // Раскрывающаяся секция "Параметры для цистерн"
+                  if (_selectedWagonTypeId != null &&
+                      referenceProvider.wagonTypes.any((wt) =>
+                          wt.id == _selectedWagonTypeId &&
+                          wt.name.toLowerCase().contains('цистерн')))
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.blue.shade200),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.blue.shade100,
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: ExpansionTile(
+                        title: Text(
+                          'Параметры для цистерн',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.blue.shade700,
+                          ),
+                        ),
+                        leading: Icon(Icons.local_gas_station, color: Colors.blue.shade600),
+                        iconColor: Colors.blue.shade600,
+                        collapsedIconColor: Colors.blue.shade400,
+                        initiallyExpanded: _showCisternParams,
+                        onExpansionChanged: (expanded) {
                           setState(() {
-                            if (selected) {
-                              _selectedClimateConditionIds.add(condition.id);
-                            } else {
-                              _selectedClimateConditionIds.remove(condition.id);
-                            }
+                            _showCisternParams = expanded;
                           });
                         },
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 16),
-                  // Макс. вес груза
-                  TextFormField(
-                    controller: _maxLoadWeightController,
-                    decoration: const InputDecoration(
-                      labelText: 'Макс. вес груза (т, опционально)',
-                      border: OutlineInputBorder(),
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Column(
+                              children: [
+                                // Тип цистерны
+                                DropdownButtonFormField<int>(
+                                  value: _selectedCisternTypeId,
+                                  isExpanded: true,
+                                  decoration: InputDecoration(
+                                    labelText: 'Тип цистерны',
+                                    labelStyle: TextStyle(color: Colors.blue.shade700),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide(color: Colors.blue.shade300),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide(color: Colors.blue.shade300),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide(color: Colors.blue.shade600, width: 2),
+                                    ),
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    helperText: 'Опционально',
+                                    helperStyle: TextStyle(color: Colors.blue.shade600),
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                  ),
+                                  dropdownColor: Colors.white,
+                                  style: const TextStyle(color: Colors.black87),
+                                  icon: Icon(Icons.arrow_drop_down, color: Colors.blue.shade700),
+                                  items: [
+                                    const DropdownMenuItem<int>(
+                                      value: null,
+                                      child: Text('Не указано'),
+                                    ),
+                                    ...referenceProvider.cisternTypes
+                                        .map(
+                                          (cisternType) => DropdownMenuItem<int>(
+                                            value: cisternType.id,
+                                            child: Text(
+                                              cisternType.name,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        )
+                                        .toList(),
+                                  ],
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _selectedCisternTypeId = value;
+                                    });
+                                  },
+                                ),
+                                const SizedBox(height: 16),
+                                // Высота налива (диапазон)
+                                const Text(
+                                  'Высота налива (см)',
+                                  style: TextStyle(fontWeight: FontWeight.w500),
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: TextFormField(
+                                        controller: _fillHeightMinController,
+                                        decoration: InputDecoration(
+                                          labelText: 'От (см)',
+                                          labelStyle: TextStyle(color: Colors.blue.shade700),
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(8),
+                                            borderSide: BorderSide(color: Colors.blue.shade300),
+                                          ),
+                                          enabledBorder: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(8),
+                                            borderSide: BorderSide(color: Colors.blue.shade300),
+                                          ),
+                                          focusedBorder: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(8),
+                                            borderSide: BorderSide(color: Colors.blue.shade600, width: 2),
+                                          ),
+                                          filled: true,
+                                          fillColor: Colors.white,
+                                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                        ),
+                                        keyboardType: const TextInputType.numberWithOptions(
+                                            decimal: true),
+                                        style: const TextStyle(color: Colors.black87),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: TextFormField(
+                                        controller: _fillHeightMaxController,
+                                        decoration: InputDecoration(
+                                          labelText: 'До (см)',
+                                          labelStyle: TextStyle(color: Colors.blue.shade700),
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(8),
+                                            borderSide: BorderSide(color: Colors.blue.shade300),
+                                          ),
+                                          enabledBorder: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(8),
+                                            borderSide: BorderSide(color: Colors.blue.shade300),
+                                          ),
+                                          focusedBorder: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(8),
+                                            borderSide: BorderSide(color: Colors.blue.shade600, width: 2),
+                                          ),
+                                          filled: true,
+                                          fillColor: Colors.white,
+                                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                        ),
+                                        keyboardType: const TextInputType.numberWithOptions(
+                                            decimal: true),
+                                        style: const TextStyle(color: Colors.black87),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                  ),
                   const SizedBox(height: 16),
                   // Кнопка добавить требование
-                  ElevatedButton.icon(
-                    onPressed: _addComposeItem,
-                    icon: const Icon(Icons.add),
-                    label: const Text('Добавить требование'),
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Colors.blue.shade600, Colors.blue.shade400],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.blue.shade300,
+                          blurRadius: 6,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: ElevatedButton.icon(
+                      onPressed: _addComposeItem,
+                      icon: const Icon(Icons.add_circle_outline, color: Colors.white),
+                      label: const Text(
+                        'Добавить требование',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
+                        backgroundColor: Colors.transparent,
+                        shadowColor: Colors.transparent,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  // Раскрывающаяся секция "Параметры сопровождения состава"
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.blue.shade200),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.blue.shade100,
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: ExpansionTile(
+                      title: Text(
+                        'Параметры сопровождения состава',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.blue.shade700,
+                        ),
+                      ),
+                      subtitle: _selectedCompositionConductorsId != null
+                          ? Builder(
+                              builder: (context) {
+                                final referenceProvider = Provider.of<ReferenceProvider>(context, listen: false);
+                                return Text(
+                                  'Проводники: ${referenceProvider.conductors.firstWhere((c) => c.id == _selectedCompositionConductorsId).name}',
+                                  style: TextStyle(fontSize: 12, color: Colors.blue.shade600),
+                                );
+                              },
+                            )
+                          : Text(
+                              'Люди, сопровождающие состав во время движения',
+                              style: TextStyle(fontSize: 12, color: Colors.blue.shade500),
+                            ),
+                      leading: Icon(Icons.people, color: Colors.blue.shade600),
+                      iconColor: Colors.blue.shade600,
+                      collapsedIconColor: Colors.blue.shade400,
+                      initiallyExpanded: _showCompositionParams,
+                      onExpansionChanged: (expanded) {
+                        setState(() {
+                          _showCompositionParams = expanded;
+                        });
+                      },
+                      children: [
+                      Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          children: [
+                            // Проводники состава
+                            DropdownButtonFormField<int>(
+                              value: _selectedCompositionConductorsId,
+                              isExpanded: true,
+                              decoration: InputDecoration(
+                                labelText: 'Проводники состава',
+                                labelStyle: TextStyle(color: Colors.blue.shade700),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: BorderSide(color: Colors.blue.shade300),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: BorderSide(color: Colors.blue.shade300),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: BorderSide(color: Colors.blue.shade600, width: 2),
+                                ),
+                                filled: true,
+                                fillColor: Colors.white,
+                                helperText: 'Люди, сопровождающие состав во время движения',
+                                helperStyle: TextStyle(color: Colors.blue.shade600, fontSize: 11),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              ),
+                              dropdownColor: Colors.white,
+                              style: const TextStyle(color: Colors.black87),
+                              icon: Icon(Icons.arrow_drop_down, color: Colors.blue.shade700),
+                              items: [
+                                const DropdownMenuItem<int>(
+                                  value: null,
+                                  child: Text('Не указано'),
+                                ),
+                                ...referenceProvider.conductors
+                                    .map(
+                                      (conductor) => DropdownMenuItem<int>(
+                                        value: conductor.id,
+                                        child: Text(
+                                          conductor.name,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
+                              ],
+                              onChanged: (value) {
+                                setState(() {
+                                  _selectedCompositionConductorsId = value;
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 24),
                   // Список добавленных требований
-                  if (_composeItems.isNotEmpty) ...[
+                  ...(_composeItems.isNotEmpty ? [
                     const Text(
                       'Требования к составу:',
                       style: TextStyle(fontWeight: FontWeight.bold),
@@ -387,8 +1480,6 @@ class _ComposerScreenState extends State<ComposerScreen> {
                       final item = _composeItems[index];
                       final wagonType = referenceProvider.wagonTypes
                           .firstWhere((t) => t.id == item['wagon_type']);
-                      final cargoType = referenceProvider.cargoTypes
-                          .firstWhere((c) => c.id == item['cargo_type']);
                       final firm = item['firm'] != null
                           ? referenceProvider.firms
                               .firstWhere((f) => f.id == item['firm'])
@@ -397,7 +1488,7 @@ class _ComposerScreenState extends State<ComposerScreen> {
                         margin: const EdgeInsets.only(bottom: 8),
                         child: ListTile(
                           title: Text(
-                            '${wagonType.name} / ${cargoType.name}',
+                            wagonType.name,
                             style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                           ),
                           subtitle: Column(
@@ -415,9 +1506,73 @@ class _ComposerScreenState extends State<ComposerScreen> {
                                     color: Colors.grey.shade600,
                                   ),
                                 ),
-                              if (item['max_load_weight'] != null)
+                              if (item['load_capacity_min'] != null || item['load_capacity_max'] != null)
                                 Text(
-                                  'Макс. вес: ${item['max_load_weight']} т',
+                                  'Грузоподъёмность: ${item['load_capacity_min'] ?? '?'} - ${item['load_capacity_max'] ?? '?'} т',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                              if (item['axle_count'] != null)
+                                Text(
+                                  'Оси: ${item['axle_count']}',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                              if (item['wagon_weight_min'] != null || item['wagon_weight_max'] != null)
+                                Text(
+                                  'Масса вагона: ${item['wagon_weight_min'] ?? '?'} - ${item['wagon_weight_max'] ?? '?'} кг',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                              if (item['net_weight_min'] != null || item['net_weight_max'] != null)
+                                Text(
+                                  'Масса нетто: ${item['net_weight_min'] ?? '?'} - ${item['net_weight_max'] ?? '?'} кг',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                              if (item['body_volume_min'] != null || item['body_volume_max'] != null)
+                                Text(
+                                  'Объём кузова: ${item['body_volume_min'] ?? '?'} - ${item['body_volume_max'] ?? '?'} м³',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                              if (item['can_roll_from_hill'] != null)
+                                Text(
+                                  'Скатывание с горки: ${item['can_roll_from_hill'] ? 'Да' : 'Нет'}',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                              if (item['condition_status'] != null)
+                                Text(
+                                  'Состояние: ${item['condition_status']}',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                              if (item['cistern_type_id'] != null)
+                                Text(
+                                  'Тип цистерны: ${referenceProvider.cisternTypes.firstWhere((c) => c.id == item['cistern_type_id']).name}',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                              if (item['fill_height_min'] != null || item['fill_height_max'] != null)
+                                Text(
+                                  'Высота налива: ${item['fill_height_min'] ?? '?'} - ${item['fill_height_max'] ?? '?'} см',
                                   style: TextStyle(
                                     fontSize: 11,
                                     color: Colors.grey.shade600,
@@ -434,7 +1589,7 @@ class _ComposerScreenState extends State<ComposerScreen> {
                         ),
                       );
                     }),
-                  ],
+                  ] : []),
                   const SizedBox(height: 24),
                   const Divider(),
                   const SizedBox(height: 16),
@@ -446,18 +1601,53 @@ class _ComposerScreenState extends State<ComposerScreen> {
                   // Макс. общая длина
                   TextFormField(
                     controller: _maxTotalLengthController,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Макс. общая длина (м, опционально)',
-                      border: OutlineInputBorder(),
+                      labelStyle: TextStyle(color: Colors.blue.shade700),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: Colors.blue.shade300),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: Colors.blue.shade300),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: Colors.blue.shade600, width: 2),
+                      ),
+                      filled: true,
+                      fillColor: Colors.white,
                       helperText: 'Максимальная общая длина всего состава',
+                      helperStyle: TextStyle(color: Colors.blue.shade600),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     ),
                     keyboardType:
                         const TextInputType.numberWithOptions(decimal: true),
+                    style: const TextStyle(color: Colors.black87),
                   ),
                   const SizedBox(height: 24),
                   // Кнопка подобрать состав
-                  ElevatedButton(
-                    onPressed: _isComposing ? null : _composeTrain,
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: _isComposing 
+                            ? [Colors.grey.shade400, Colors.grey.shade300]
+                            : [Colors.blue.shade700, Colors.blue.shade500],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow: _isComposing ? null : [
+                        BoxShadow(
+                          color: Colors.blue.shade300,
+                          blurRadius: 6,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: ElevatedButton(
+                      onPressed: _isComposing ? null : _composeTrain,
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 18),
                       backgroundColor: Colors.blue,
@@ -486,6 +1676,7 @@ class _ComposerScreenState extends State<ComposerScreen> {
                               ),
                             ],
                           ),
+                    ),
                   ),
                 ],
               ),
@@ -529,6 +1720,21 @@ class _ComposerScreenState extends State<ComposerScreen> {
                               ),
                           ],
                         ),
+                        ElevatedButton.icon(
+                          onPressed: _isSaving ? null : _saveCompose,
+                          icon: _isSaving
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.save),
+                          label: const Text('Сохранить вагон'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
                       ],
                     ],
                   ),
@@ -544,7 +1750,7 @@ class _ComposerScreenState extends State<ComposerScreen> {
                                 _composedWagons.add(wagon);
                                 _selectedWagonIds.add(wagon.id ?? 0);
                                 _totalLength = _composedWagons
-                                    .fold<double>(0.0, (sum, w) => sum + w.length);
+                                    .fold<double>(0.0, (sum, w) => sum + (w.length ?? 0.0));
                               }
                             });
                           },
@@ -615,7 +1821,7 @@ class _ComposerScreenState extends State<ComposerScreen> {
                                                 _composedWagons.insert(newIndex, draggedWagon);
                                                 // Пересчитываем длину
                                                 _totalLength = _composedWagons
-                                                    .fold<double>(0.0, (sum, w) => sum + w.length);
+                                                    .fold<double>(0.0, (sum, w) => sum + (w.length ?? 0.0));
                                               }
                                             });
                                           },
@@ -690,7 +1896,7 @@ class _ComposerScreenState extends State<ComposerScreen> {
                                                           _selectedWagonIds.remove(wagon.id ?? 0);
                                                           _totalLength = _composedWagons
                                                               .fold<double>(
-                                                                  0.0, (sum, w) => sum + w.length);
+                                                                  0.0, (sum, w) => sum + (w.length ?? 0.0));
                                                         });
                                                       },
                                                     ),
@@ -762,15 +1968,15 @@ class _ComposerScreenState extends State<ComposerScreen> {
                 Expanded(
                   child: wagonProvider.isLoading
                       ? const Center(child: CircularProgressIndicator())
-                      : wagonProvider.wagons.isEmpty
+                      : wagonProvider.availableWagons.isEmpty
                           ? const Center(
                               child: Text('Нет доступных вагонов'),
                             )
                           : ListView.builder(
                               padding: const EdgeInsets.symmetric(horizontal: 8),
-                              itemCount: wagonProvider.wagons.length,
+                              itemCount: wagonProvider.availableWagons.length,
                               itemBuilder: (context, index) {
-                                final wagon = wagonProvider.wagons[index];
+                                final wagon = wagonProvider.availableWagons[index];
                                 final isSelected = _selectedWagonIds.contains(wagon.id);
                                 return Padding(
                                   padding: const EdgeInsets.symmetric(

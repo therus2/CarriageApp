@@ -5,7 +5,8 @@ import '../models/user.dart';
 import '../models/wagon.dart';
 import '../models/wagon_type.dart';
 import '../models/cargo_type.dart';
-import '../models/climate_condition.dart';
+import '../models/cistern_type.dart';
+import '../models/conductor.dart';
 import '../models/firm.dart';
 import '../models/station_config.dart';
 import 'storage_service.dart';
@@ -179,11 +180,10 @@ class ApiService {
     }
   }
 
-  Future<List<ClimateCondition>> getClimateConditions() async {
+  Future<List<CisternType>> getCisternTypes() async {
     try {
       final response = await http.get(
-        Uri.parse(
-            '${ApiConstants.baseUrl}${ApiConstants.climateConditionsEndpoint}'),
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.cisternTypesEndpoint}'),
         headers: await _getHeaders(),
       );
 
@@ -192,34 +192,72 @@ class ApiService {
         final List<dynamic> data = decoded is List
             ? decoded
             : (decoded['results'] as List<dynamic>? ?? []);
-        print('Получено климатических условий: ${data.length}');
-        return data.map((e) => ClimateCondition.fromJson(e)).toList();
+        print('Получено типов цистерн: ${data.length}');
+        return data.map((e) => CisternType.fromJson(e)).toList();
       }
-      print(
-          'Ошибка получения климатических условий: статус ${response.statusCode}');
+      print('Ошибка получения типов цистерн: статус ${response.statusCode}');
       return [];
     } catch (e) {
-      print('Ошибка получения климатических условий: $e');
+      print('Ошибка получения типов цистерн: $e');
       return [];
     }
   }
 
-  Future<ClimateCondition?> createClimateCondition(
-      ClimateCondition condition) async {
+  Future<CisternType?> createCisternType(CisternType cisternType) async {
     try {
       final response = await http.post(
-        Uri.parse(
-            '${ApiConstants.baseUrl}${ApiConstants.climateConditionsEndpoint}'),
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.cisternTypesEndpoint}'),
         headers: await _getHeaders(),
-        body: jsonEncode(condition.toJson()),
+        body: jsonEncode(cisternType.toJson()),
       );
 
       if (response.statusCode == 201) {
-        return ClimateCondition.fromJson(jsonDecode(response.body));
+        return CisternType.fromJson(jsonDecode(response.body));
       }
       return null;
     } catch (e) {
-      print('Ошибка создания климатического условия: $e');
+      print('Ошибка создания типа цистерны: $e');
+      return null;
+    }
+  }
+
+  Future<List<Conductor>> getConductors() async {
+    try {
+      final response = await http.get(
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.conductorsEndpoint}'),
+        headers: await _getHeaders(),
+      );
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        final List<dynamic> data = decoded is List
+            ? decoded
+            : (decoded['results'] as List<dynamic>? ?? []);
+        print('Получено проводников: ${data.length}');
+        return data.map((e) => Conductor.fromJson(e)).toList();
+      }
+      print('Ошибка получения проводников: статус ${response.statusCode}');
+      return [];
+    } catch (e) {
+      print('Ошибка получения проводников: $e');
+      return [];
+    }
+  }
+
+  Future<Conductor?> createConductor(Conductor conductor) async {
+    try {
+      final response = await http.post(
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.conductorsEndpoint}'),
+        headers: await _getHeaders(),
+        body: jsonEncode(conductor.toJson()),
+      );
+
+      if (response.statusCode == 201) {
+        return Conductor.fromJson(jsonDecode(response.body));
+      }
+      return null;
+    } catch (e) {
+      print('Ошибка создания проводника: $e');
       return null;
     }
   }
@@ -364,7 +402,7 @@ class ApiService {
 
   // Compose method
   Future<Map<String, dynamic>> composeTrain(List<Map<String, dynamic>> items,
-      {double? maxTotalLength, int? totalWagonsCount}) async {
+      {double? maxTotalLength, int? totalWagonsCount, int? conductorsId}) async {
     try {
       final body = <String, dynamic>{
         'items': items,
@@ -374,6 +412,9 @@ class ApiService {
       }
       if (totalWagonsCount != null) {
         body['total_wagons_count'] = totalWagonsCount;
+      }
+      if (conductorsId != null) {
+        body['conductors_id'] = conductorsId;
       }
 
       final response = await http.post(
@@ -398,6 +439,26 @@ class ApiService {
         'success': false,
         'error': 'Ошибка соединения: $e',
       };
+    }
+  }
+
+  // Сохранение состава и получение PDF
+  Future<http.Response> saveCompose(List<int> wagonIds, {int? conductorsId}) async {
+    try {
+      final body = <String, dynamic>{
+        'wagon_ids': wagonIds,
+      };
+      if (conductorsId != null) {
+        body['conductors_id'] = conductorsId;
+      }
+      final response = await http.post(
+        Uri.parse('${ApiConstants.baseUrl}${ApiConstants.composeSaveEndpoint}'),
+        headers: await _getHeaders(),
+        body: jsonEncode(body),
+      );
+      return response;
+    } catch (e) {
+      throw Exception('Ошибка сохранения состава: $e');
     }
   }
 }

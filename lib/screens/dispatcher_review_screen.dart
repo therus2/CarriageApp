@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/wagon_provider.dart';
 import '../widgets/wagon_card.dart';
+import '../theme/app_theme.dart';
 import 'main_menu_screen.dart';
 
 class DispatcherReviewScreen extends StatelessWidget {
@@ -55,7 +56,7 @@ class DispatcherReviewScreen extends StatelessWidget {
                 child: SizedBox(
                   width: double.infinity,
                   height: 50,
-                  child: ElevatedButton(
+                  child: AppTheme.buildGradientButton(
                     onPressed: wagonProvider.isLoading
                         ? null
                         : () async {
@@ -89,9 +90,24 @@ class DispatcherReviewScreen extends StatelessWidget {
                               );
                             }
                           },
+                    isEnabled: !wagonProvider.isLoading,
                     child: wagonProvider.isLoading
-                        ? const CircularProgressIndicator()
-                        : const Text('Сохранить'),
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : const Text(
+                            'Сохранить',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                   ),
                 ),
               ),

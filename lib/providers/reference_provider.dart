@@ -1,7 +1,8 @@
 import 'package:flutter/foundation.dart';
 import '../models/wagon_type.dart';
 import '../models/cargo_type.dart';
-import '../models/climate_condition.dart';
+import '../models/cistern_type.dart';
+import '../models/conductor.dart';
 import '../models/firm.dart';
 import '../models/station_config.dart';
 import '../services/api_service.dart';
@@ -11,7 +12,8 @@ class ReferenceProvider with ChangeNotifier {
 
   List<WagonType> _wagonTypes = [];
   List<CargoType> _cargoTypes = [];
-  List<ClimateCondition> _climateConditions = [];
+  List<CisternType> _cisternTypes = [];
+  List<Conductor> _conductors = [];
   List<Firm> _firms = [];
   StationConfig? _stationConfig;
 
@@ -20,7 +22,8 @@ class ReferenceProvider with ChangeNotifier {
 
   List<WagonType> get wagonTypes => _wagonTypes;
   List<CargoType> get cargoTypes => _cargoTypes;
-  List<ClimateCondition> get climateConditions => _climateConditions;
+  List<CisternType> get cisternTypes => _cisternTypes;
+  List<Conductor> get conductors => _conductors;
   List<Firm> get firms => _firms;
   StationConfig? get stationConfig => _stationConfig;
   bool get isLoading => _isLoading;
@@ -36,8 +39,10 @@ class ReferenceProvider with ChangeNotifier {
       print('ReferenceProvider: загружено типов вагонов: ${_wagonTypes.length}');
       _cargoTypes = await _apiService.getCargoTypes();
       print('ReferenceProvider: загружено типов грузов: ${_cargoTypes.length}');
-      _climateConditions = await _apiService.getClimateConditions();
-      print('ReferenceProvider: загружено климатических условий: ${_climateConditions.length}');
+      _cisternTypes = await _apiService.getCisternTypes();
+      print('ReferenceProvider: загружено типов цистерн: ${_cisternTypes.length}');
+      _conductors = await _apiService.getConductors();
+      print('ReferenceProvider: загружено проводников: ${_conductors.length}');
       _firms = await _apiService.getFirms();
       print('ReferenceProvider: загружено фирм: ${_firms.length}');
       _stationConfig = await _apiService.getStationConfig();
@@ -83,17 +88,33 @@ class ReferenceProvider with ChangeNotifier {
     }
   }
 
-  Future<bool> addClimateCondition(ClimateCondition condition) async {
+  Future<bool> addCisternType(CisternType cisternType) async {
     try {
-      final created = await _apiService.createClimateCondition(condition);
+      final created = await _apiService.createCisternType(cisternType);
       if (created != null) {
-        _climateConditions.add(created);
+        _cisternTypes.add(created);
         notifyListeners();
         return true;
       }
       return false;
     } catch (e) {
-      _error = 'Ошибка создания климатического условия: $e';
+      _error = 'Ошибка создания типа цистерны: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> addConductor(Conductor conductor) async {
+    try {
+      final created = await _apiService.createConductor(conductor);
+      if (created != null) {
+        _conductors.add(created);
+        notifyListeners();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      _error = 'Ошибка создания проводника: $e';
       notifyListeners();
       return false;
     }

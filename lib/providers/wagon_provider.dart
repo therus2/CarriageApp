@@ -13,16 +13,22 @@ class WagonProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
-  Future<void> loadWagons({bool? isOperational, int? path}) async {
+  Future<void> loadWagons({bool? isOperational, int? path, bool? excludeInConsist}) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      _wagons = await _apiService.getWagons(
+      final wagons = await _apiService.getWagons(
         isOperational: isOperational,
         path: path,
       );
+      // Фильтруем вагоны, которые в составе (если excludeInConsist = true или по умолчанию)
+      if (excludeInConsist != false) {
+        _wagons = wagons.where((w) => !w.inConsist).toList();
+      } else {
+        _wagons = wagons;
+      }
     } catch (e) {
       _error = 'Ошибка загрузки вагонов: $e';
     } finally {
@@ -30,6 +36,9 @@ class WagonProvider with ChangeNotifier {
       notifyListeners();
     }
   }
+  
+  // Геттер для получения только доступных вагонов (не в составе)
+  List<Wagon> get availableWagons => _wagons.where((w) => !w.inConsist).toList();
 
   void addWagon(Wagon wagon) {
     _wagons.add(wagon);

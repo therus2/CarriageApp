@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../theme/app_theme.dart';
 import 'dispatcher_count_screen.dart';
 import 'composer_screen.dart';
 
@@ -38,7 +39,7 @@ class MainMenuScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 48),
                 if (role == 'DISPATCHER' || role == 'ADMIN')
-                  ElevatedButton.icon(
+                  AppTheme.buildGradientButton(
                     onPressed: () {
                       Navigator.push(
                         context,
@@ -47,18 +48,25 @@ class MainMenuScreen extends StatelessWidget {
                         ),
                       );
                     },
-                    icon: const Icon(Icons.add),
-                    label: const Text('Ввести вагоны'),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 32,
-                        vertical: 16,
-                      ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.add, color: Colors.white),
+                        SizedBox(width: 8),
+                        Text(
+                          'Ввести вагоны',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 if (role == 'COMPOSER' || role == 'ADMIN') ...[
                   const SizedBox(height: 16),
-                  ElevatedButton.icon(
+                  AppTheme.buildGradientButton(
                     onPressed: () {
                       Navigator.push(
                         context,
@@ -67,13 +75,20 @@ class MainMenuScreen extends StatelessWidget {
                         ),
                       );
                     },
-                    icon: const Icon(Icons.train),
-                    label: const Text('Создать состав'),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 32,
-                        vertical: 16,
-                      ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.train, color: Colors.white),
+                        SizedBox(width: 8),
+                        Text(
+                          'Создать состав',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
