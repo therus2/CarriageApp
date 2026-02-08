@@ -110,6 +110,21 @@ class _DispatcherInputScreenState extends State<DispatcherInputScreen> {
   }
 
   void _nextWagon() {
+    // Валидация массы вагона перед переходом
+    final formData = _formData[_currentIndex] ?? {};
+    final wagonWeight = formData['wagonWeight'];
+    
+    if (wagonWeight == null || (wagonWeight is double && wagonWeight <= 0)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Ошибка: Масса вагона обязательна для заполнения!'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+    
     _saveCurrentForm();
     final wagonProvider = Provider.of<WagonProvider>(context, listen: false);
     if (_currentIndex < wagonProvider.wagons.length - 1) {
@@ -175,8 +190,13 @@ class _DispatcherInputScreenState extends State<DispatcherInputScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
-          TextButton(
+          ElevatedButton(
             onPressed: _nextWagon,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            ),
             child: Text(_currentIndex < wagons.length - 1 ? 'Далее' : 'Обзор'),
           ),
         ],

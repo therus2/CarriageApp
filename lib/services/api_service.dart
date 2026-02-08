@@ -443,13 +443,21 @@ class ApiService {
   }
 
   // Сохранение состава и получение PDF
-  Future<http.Response> saveCompose(List<int> wagonIds, {int? conductorsId}) async {
+  Future<http.Response> saveCompose(
+    List<int> wagonIds, {
+    int? conductorsId,
+    List<Map<String, dynamic>>? editedWagonsData,
+  }) async {
     try {
       final body = <String, dynamic>{
         'wagon_ids': wagonIds,
       };
       if (conductorsId != null) {
         body['conductors_id'] = conductorsId;
+      }
+      // Передаем отредактированные данные для PDF (не сохраняются в БД)
+      if (editedWagonsData != null && editedWagonsData.isNotEmpty) {
+        body['edited_wagons_data'] = editedWagonsData;
       }
       final response = await http.post(
         Uri.parse('${ApiConstants.baseUrl}${ApiConstants.composeSaveEndpoint}'),

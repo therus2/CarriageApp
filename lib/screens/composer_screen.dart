@@ -8,6 +8,8 @@ import '../providers/reference_provider.dart';
 import '../widgets/wagon_card.dart';
 import '../models/wagon.dart';
 import '../services/api_service.dart';
+import 'compose_edit_screen.dart';
+import '../models/editable_wagon_data.dart';
 
 class ComposerScreen extends StatefulWidget {
   const ComposerScreen({super.key});
@@ -417,6 +419,20 @@ class _ComposerScreenState extends State<ComposerScreen> {
   Future<void> _saveCompose() async {
     if (_composedWagons.isEmpty || _isSaving) return;
 
+    // Показываем экран редактирования состава
+    final editedWagonsData = await Navigator.push<List<EditableWagonData>>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ComposeEditScreen(
+          wagons: _composedWagons,
+          conductorsId: _selectedCompositionConductorsId,
+        ),
+      ),
+    );
+
+    // Если пользователь отменил редактирование
+    if (editedWagonsData == null || editedWagonsData.isEmpty) return;
+
     // Показываем диалог подтверждения
     final confirm = await showDialog<bool>(
       context: context,
@@ -440,14 +456,14 @@ class _ComposerScreenState extends State<ComposerScreen> {
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
-                  ..._composedWagons.asMap().entries.map(
+                  ...editedWagonsData.asMap().entries.map(
                     (entry) {
                       final index = entry.key;
                       final wagon = entry.value;
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 4),
                         child: Text(
-                          '${index + 1}. Вагон ${wagon.wagonNumber} (Путь ${wagon.pathNumber}, Позиция ${wagon.position})',
+                          '${wagon.position}. Вагон ${wagon.wagonNumber} (Путь ${wagon.pathNumber}, Позиция ${wagon.wagonPosition})',
                         ),
                       );
                     },
@@ -478,7 +494,7 @@ class _ComposerScreenState extends State<ComposerScreen> {
 
     try {
       final apiService = ApiService();
-      final wagonIds = _composedWagons
+      final wagonIds = editedWagonsData
           .where((w) => w.id != null)
           .map((w) => w.id!)
           .toList();
@@ -493,9 +509,13 @@ class _ComposerScreenState extends State<ComposerScreen> {
         return;
       }
 
+      // Преобразуем отредактированные данные в JSON
+      final editedData = editedWagonsData.map((w) => w.toJson()).toList();
+
       final response = await apiService.saveCompose(
         wagonIds,
         conductorsId: _selectedCompositionConductorsId,
+        editedWagonsData: editedData,
       );
 
       if (!mounted) return;
@@ -518,9 +538,14 @@ class _ComposerScreenState extends State<ComposerScreen> {
             SnackBar(
               content: Text('PDF файл сохранён: ${file.path}'),
               backgroundColor: Colors.green,
-              duration: const Duration(seconds: 5),
+              duration: const Duration(seconds: 3),
             ),
           );
+          
+          // Возвращаемся на главный экран
+          if (mounted) {
+            Navigator.of(context).popUntil((route) => route.isFirst);
+          }
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -528,6 +553,11 @@ class _ComposerScreenState extends State<ComposerScreen> {
               backgroundColor: Colors.green,
             ),
           );
+          
+          // Возвращаемся на главный экран
+          if (mounted) {
+            Navigator.of(context).popUntil((route) => route.isFirst);
+          }
         }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1157,6 +1187,7 @@ class _ComposerScreenState extends State<ComposerScreen> {
                         ),
                       ),
                     ],
+                    )
                   ),
                   // Раскрывающаяся секция "Параметры для цистерн"
                   if (_selectedWagonTypeId != null &&
