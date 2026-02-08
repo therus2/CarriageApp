@@ -1,53 +1,119 @@
 import 'package:flutter/material.dart';
-import '../models/wagon.dart';
-import '../services/api_service.dart';
+import 'package:provider/provider.dart';
+import '../providers/wagon_provider.dart';
 import '../widgets/wagon_card.dart';
+import '../theme/app_theme.dart';
+import 'main_menu_screen.dart';
 
 class DispatcherReviewScreen extends StatelessWidget {
-  final ApiService api;
-  final List<Wagon> wagons;
-
-  DispatcherReviewScreen({required this.api, required this.wagons});
-
-  Future<void> saveAll(BuildContext context) async {
-    for (var wagon in wagons) {
-      await api.createWagon(wagon);
-    }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Вагоны успешно сохранены')),
-    );
-
-    Navigator.popUntil(context, (route) => route.isFirst);
-  }
+  const DispatcherReviewScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Проверка вагонов'),
+        title: Consumer<WagonProvider>(
+          builder: (context, wagonProvider, _) {
+            return Text('Обзор вагонов (${wagonProvider.wagons.length})');
+          },
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: GridView.builder(
-              gridDelegate:
-              SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 4,
-                childAspectRatio: 1.6,
+      body: Consumer<WagonProvider>(
+        builder: (context, wagonProvider, _) {
+          if (wagonProvider.isLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (wagonProvider.wagons.isEmpty) {
+            return const Center(child: Text('Нет вагонов для обзора'));
+          }
+
+          return Column(
+            children: [
+              Expanded(
+                child: GridView.builder(
+                  padding: const EdgeInsets.all(16),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    crossAxisSpacing: 16,
+                    mainAxisSpacing: 16,
+                    childAspectRatio: 1.5,
+                  ),
+                  itemCount: wagonProvider.wagons.length,
+                  itemBuilder: (context, index) {
+                    return WagonCard(
+                      wagon: wagonProvider.wagons[index],
+                    );
+                  },
+                ),
               ),
-              itemCount: wagons.length,
-              itemBuilder: (_, i) => WagonCard(wagon: wagons[i]),
-            ),
-          ),
-          Padding(
-            padding: EdgeInsets.all(16),
-            child: ElevatedButton(
-              onPressed: () => saveAll(context),
-              child: Text('Сохранить'),
-            ),
-          )
-        ],
+              Container(
+                padding: const EdgeInsets.all(16),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: AppTheme.buildGradientButton(
+                    onPressed: wagonProvider.isLoading
+                        ? null
+                        : () async {
+                            final result = await wagonProvider.saveWagons();
+                            if (!context.mounted) return;
+
+                            if (result['success'] == true) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Вагоны успешно сохранены'),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                              wagonProvider.clearWagons();
+                              Navigator.pushAndRemoveUntil(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const MainMenuScreen(),
+                                ),
+                                (route) => false,
+                              );
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    result['error']?.toString() ??
+                                        'Ошибка сохранения',
+                                  ),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          },
+                    isEnabled: !wagonProvider.isLoading,
+                    child: wagonProvider.isLoading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : const Text(
+                            'Сохранить',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
